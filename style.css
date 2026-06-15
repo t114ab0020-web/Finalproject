@@ -263,3 +263,113 @@
     color: white;
     margin-top: 2px;
 }
+
+/* Vote Section Styles */
+.vote-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.vote-option-card {
+    background-color: #ffffff;
+    border: 2px solid #e0e3e5;
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.2s;
+}
+
+.vote-option-card.selected {
+    border-color: #00685f;
+    background-color: #f4fffc;
+}
+
+.vote-count-badge {
+    background-color: #f2f4f6;
+    color: #3d4947;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.top-vote-badge {
+    background-color: #008378;
+    color: #ffffff;
+}
+
+/* Notification Styles */
+.notification-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 10px;
+    height: 10px;
+    background-color: #ba1a1a;
+    border-radius: 999px;
+    border: 2px solid #ffffff;
+}
+
+.notification-badge.with-count {
+    width: auto;
+    height: 16px;
+    min-width: 16px;
+    padding: 0 4px;
+    font-size: 10px;
+    line-height: 12px;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    top: 0px;
+    right: 0px;
+}
+
+.notification-card {
+    background-color: #ffffff;
+    border: 1px solid #e0e3e5;
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.notification-card:hover {
+    background-color: #f7f9fb;
+}
+
+.notification-card.unread {
+    background-color: #f4fffc;
+    border-color: #89f5e7;
+}
+
+.notification-type-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.notification-type-badge.vote-start {
+    background-color: #e0e3e5;
+    color: #3d4947;
+}
+
+.notification-type-badge.vote-result {
+    background-color: #00685f;
+    color: #ffffff;
+}
+
+.schedule-meeting-cell {
+    background: #d8f5ee;
+    color: #00685f;
+    border: 1px solid #96f3e1;
+    font-weight: 700;
+}

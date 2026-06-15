@@ -49,6 +49,14 @@ function getStudentBusyMask(studentId, day, includeClub = true, includeWork = tr
         mask |= sch.customBusy.work.schedule[day];
     }
 
+    if (sch.customBusy && sch.customBusy.extra) {
+        sch.customBusy.extra.forEach(item => {
+            if (item.day === day) {
+                mask |= item.mask;
+            }
+        });
+    }
+
     return mask;
 }
 
@@ -177,13 +185,65 @@ function updateTabActive(index) {
     }
 }
 
+function getShortGroupName(groupName) {
+    if (!groupName) return "小組討論";
+    return groupName
+        .replace(/\s*-\s*/g, " ")
+        .replace("第一討論小組", "討論")
+        .replace("奇蹟前後端小組", "討論")
+        .trim();
+}
+
+function getScheduledMeetingsForStudent(studentId, excludeGroupId = null) {
+    const meetings = [];
+    Object.values(GROUP_SYNC_STATE).forEach(state => {
+        if (!state || !state.voteEnded || !state.finalMeetingOptions || state.finalMeetingOptions.length === 0) return;
+        if (excludeGroupId && state.groupId === excludeGroupId) return;
+        
+        const group = GROUPS_DATA.find(g => g.id === state.groupId);
+        if (!group) return;
+
+        const compareMembers = state.selectedMembers || [];
+        const isRelated = group.members.includes(studentId) || compareMembers.includes(studentId);
+        
+        if (!isRelated) return;
+        
+        state.finalMeetingOptions.forEach(option => {
+            meetings.push({
+                id: `${state.groupId}-${option.id}`,
+                groupId: state.groupId,
+                groupName: group.name,
+                courseId: group.courseId,
+                day: option.day,
+                slotIndexes: option.slotIndexes || [],
+                label: option.label,
+                timeLabel: option.timeLabel
+            });
+        });
+    });
+    return meetings;
+}
+
+function getStudentBusyMaskWithMeetings(studentId, day, excludeGroupId = null) {
+    let mask = getStudentBusyMask(studentId, day, true, true);
+    const meetings = getScheduledMeetingsForStudent(studentId, excludeGroupId);
+    
+    meetings.forEach(meeting => {
+        if (meeting.day === day && Array.isArray(meeting.slotIndexes)) {
+            meeting.slotIndexes.forEach(index => {
+                mask |= (1 << index);
+            });
+        }
+    });
+    return mask;
+}
 
 function calculateSelectedMembersFreeTime(memberIds) {
     const result = {};
     DAYS.forEach(day => {
         let groupBusyMask = 0;
         memberIds.forEach(memberId => {
-            const memberBusy = getStudentBusyMask(memberId, day, true, true);
+            const memberBusy = getStudentBusyMaskWithMeetings(memberId, day, currentGroup);
             groupBusyMask |= memberBusy;
         });
         const groupFreeMask = (~groupBusyMask) & 0x3FFF;
@@ -328,18 +388,38 @@ function renderCourses() {
                     </div>
                 </div>
             </div>
-            ${groupsInCourse.map(g => `
+            ${groupsInCourse.map(g => {
+                const savedState = GROUP_SYNC_STATE[g.id];
+                let meetingInfoHtml = "";
+                if (savedState && savedState.voteEnded && savedState.finalMeetingOptions && savedState.finalMeetingOptions.length > 0) {
+                    const meetingTimesHtml = savedState.finalMeetingOptions
+                        .map(opt => `<div class="text-sm font-medium mt-1">${formatMeetingOptionDisplay(opt)}</div>`)
+                        .join("");
+                    meetingInfoHtml = `
+                    <div class="mt-2 p-2 bg-primary-container/20 rounded-md border border-primary/20">
+                        <div class="flex items-center gap-1 text-primary text-xs font-bold mb-1">
+                            <span class="material-symbols-outlined text-[14px]">event_available</span>
+                            已排定
+                        </div>
+                        ${meetingTimesHtml}
+                    </div>`;
+                }
+
+                return `
                 <hr class="border-outline-variant/30 mb-4"/>
-                <div class="bg-surface-container-low rounded-lg p-3 border border-outline-variant/20 flex justify-between items-center mb-2">
-                    <h4 class="font-body-md text-body-md font-bold text-primary flex items-center gap-1">
-                        <span class="material-symbols-outlined text-[18px]">group_work</span>
-                        ${g.name}
-                    </h4>
-                    <button onclick="openGroup('${g.id}')" class="px-3 py-1 bg-primary text-on-primary rounded-lg font-label-md text-label-md hover:bg-primary/90 transition-colors">
-                        進入討論
-                    </button>
-                </div>
-            `).join('')}
+                <div class="bg-surface-container-low rounded-lg p-3 border border-outline-variant/20 mb-2">
+                    <div class="flex justify-between items-center">
+                        <h4 class="font-body-md text-body-md font-bold text-primary flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[18px]">group_work</span>
+                            ${g.name}
+                        </h4>
+                        <button onclick="openGroup('${g.id}')" class="px-3 py-1 bg-primary text-on-primary rounded-lg font-label-md text-label-md hover:bg-primary/90 transition-colors">
+                            進入討論
+                        </button>
+                    </div>
+                    ${meetingInfoHtml}
+                </div>`;
+            }).join('')}
         </div>`;
     });
 }
@@ -361,6 +441,19 @@ function renderGroupMembers() {
 
     if (selectedCountEl) {
         selectedCountEl.textContent = selectedMembers.filter(id => id !== currentUser).length;
+    }
+    
+    // 插入「已決定討論時間」提示
+    const savedState = GROUP_SYNC_STATE[currentGroup];
+    if (savedState && savedState.voteEnded && savedState.finalMeetingOptions && savedState.finalMeetingOptions.length > 0) {
+        const meetingTimes = savedState.finalMeetingOptions
+            .map(opt => formatMeetingOptionDisplay(opt))
+            .join('<br>');
+        container.innerHTML += `
+        <div class="mb-4 p-4 bg-primary-container/20 rounded-xl border border-primary/20 text-center">
+            <h4 class="font-body-md text-primary font-bold mb-1">本組已決定討論時間：</h4>
+            <p class="font-body-lg text-on-surface font-semibold mt-2">${meetingTimes}</p>
+        </div>`;
     }
 
     if (!group) return;
@@ -407,21 +500,71 @@ window.toggleMember = function(id, el) {
     } else {
         selectedMembers = selectedMembers.filter(m => m !== id);
     }
+    saveCurrentGroupSyncState();
     renderGroupMembers();
 };
 
 function updateScheduleButton() {
     const btn = document.getElementById('schedule-btn');
     if (!btn) return;
-    if (selectedMembers.length > 1) {
+    
+    const savedState = GROUP_SYNC_STATE[currentGroup];
+    const isFinished = savedState && savedState.voteEnded && savedState.finalMeetingOptions && savedState.finalMeetingOptions.length > 0;
+    
+    if (isFinished) {
+        btn.innerHTML = `<span class="material-symbols-outlined">visibility</span> 查看喬時間結果`;
+    } else {
+        btn.innerHTML = `<span class="material-symbols-outlined">sync</span> 準備喬時間`;
+    }
+    
+    if (selectedMembers.length > 1 || isFinished) {
         btn.classList.remove('opacity-50', 'cursor-not-allowed');
         btn.classList.add('hover:bg-secondary');
-        btn.onclick = () => switchTab(4);
+        btn.onclick = () => goToSyncFromGroup();
     } else {
         btn.classList.add('opacity-50', 'cursor-not-allowed');
         btn.classList.remove('hover:bg-secondary');
         btn.onclick = null;
     }
+}
+
+function getCheckedMemberIdsFromGroupPage() {
+    const checked = Array.from(document.querySelectorAll(".member-checkbox:checked"))
+        .map(input => input.value);
+
+    return [...new Set([currentUser, ...checked])];
+}
+
+function goToSyncFromGroup() {
+    if (!currentGroup) return;
+
+    const savedState = GROUP_SYNC_STATE[currentGroup];
+    const hasFinalResult =
+        savedState &&
+        savedState.voteEnded &&
+        savedState.finalMeetingOptions &&
+        savedState.finalMeetingOptions.length > 0;
+
+    if (hasFinalResult) {
+        loadGroupSyncState(currentGroup);
+        switchTab(4, { preserveState: true });
+        return;
+    }
+
+    selectedMembers = getCheckedMemberIdsFromGroupPage();
+
+    if (selectedMembers.filter(id => id !== currentUser).length === 0) {
+        renderGroupMembers();
+        updateScheduleButton();
+        return;
+    }
+
+    resetVoteState();
+    hasRunSync = false;
+    currentFreeTimeResult = null;
+
+    saveCurrentGroupSyncState();
+    switchTab(4, { preserveState: true });
 }
 
 function renderSchedule() {
@@ -434,6 +577,8 @@ function renderSchedule() {
 
     const schedule = SCHEDULES_DATA[currentUser];
     if (!schedule) return;
+
+    const scheduledMeetings = getScheduledMeetingsForStudent(currentUser);
 
     let html = `<div class="schedule-grid text-center text-xs">`;
     
@@ -456,13 +601,39 @@ function renderSchedule() {
             const hasClub = (schedule.customBusy?.club?.schedule[day] & maskVal) > 0;
             const hasWork = (schedule.customBusy?.work?.schedule[day] & maskVal) > 0;
 
+            const scheduledMeeting = scheduledMeetings.find(m => 
+                m.day === day && m.slotIndexes && m.slotIndexes.includes(i)
+            );
+
             let cellClass = "bg-surface-container rounded-md h-10 flex flex-col justify-center items-center overflow-hidden";
             let content = "";
+
+            let hasExtra = false;
+            let extraItem = null;
+            if (schedule.customBusy?.extra) {
+                const found = schedule.customBusy.extra.find(item => item.day === day && (item.mask & maskVal));
+                if (found) {
+                    hasExtra = true;
+                    extraItem = found;
+                }
+            }
 
             if (hasClass) {
                 cellClass = "bg-primary-container text-on-primary-container rounded-md h-10 flex flex-col justify-center items-center shadow-sm px-0.5";
                 const cName = getCourseNameAtSlot(day, maskVal);
                 content = `<span class="schedule-cell-label">${cName}</span>`;
+            } else if (scheduledMeeting) {
+                cellClass = "schedule-meeting-cell rounded-md h-10 flex flex-col justify-center items-center shadow-sm px-0.5";
+                content = `<span class="schedule-cell-label" title="${scheduledMeeting.groupName}">${getShortGroupName(scheduledMeeting.groupName)}</span>`;
+            } else if (hasExtra) {
+                if (extraItem.type === 'club') {
+                    cellClass = "bg-tertiary-container text-on-tertiary-container rounded-md h-10 flex flex-col justify-center items-center shadow-sm px-0.5";
+                } else if (extraItem.type === 'work') {
+                    cellClass = "bg-error-container text-on-error-container rounded-md h-10 flex flex-col justify-center items-center shadow-sm px-0.5";
+                } else {
+                    cellClass = "bg-surface-container-highest border border-surface-variant diagonal-stripes rounded-md h-10 flex flex-col justify-center items-center shadow-sm px-0.5";
+                }
+                content = `<span class="schedule-cell-label">${extraItem.name}</span>`;
             } else if (hasWork) {
                 cellClass = "bg-error-container text-on-error-container rounded-md h-10 flex flex-col justify-center items-center shadow-sm px-0.5";
                 const wName = schedule.customBusy?.work?.name || "打工";
@@ -520,6 +691,26 @@ function formatSlotTimeRange(slotGroup) {
     const start = slotGroup[0].time.split(' - ')[0];
     const end = slotGroup[slotGroup.length - 1].time.split(' - ')[1];
     return `${start} - ${end}`;
+}
+
+function formatMeetingOptionDisplay(opt) {
+    if (!opt) return "";
+
+    if (opt.label && opt.timeLabel) {
+        return `${opt.label}｜${opt.timeLabel}`;
+    }
+
+    if (opt.day && Array.isArray(opt.slotIndexes)) {
+        const slotGroup = opt.slotIndexes.map(index => ({
+            index,
+            name: TIME_SLOTS[index].name,
+            time: TIME_SLOTS[index].time
+        }));
+
+        return `週${DAYS_MAP[opt.day]} ${formatSlotRange(slotGroup)}｜${formatSlotTimeRange(slotGroup)}`;
+    }
+
+    return "尚未取得完整時間";
 }
 
 function renderResultMembers() {
@@ -581,7 +772,7 @@ function renderSyncStatusCard() {
                 <p class="font-body-md text-on-surface-variant text-center">已選擇 ${memberIds.length} 位成員，點擊下方按鈕開始比對共同空堂。</p>
             </div>
             <div class="flex flex-col items-center gap-2">
-                <button onclick="hasRunSync = true; renderResultScreen();" class="w-full bg-[#3D786B] text-white font-headline-md text-headline-md py-4 rounded-xl flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform cursor-pointer hover:bg-[#2d584e]">
+                <button onclick="runSyncAndGenerateVotes();" class="w-full bg-[#3D786B] text-white font-headline-md text-headline-md py-4 rounded-xl flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform cursor-pointer hover:bg-[#2d584e]">
                     <span class="material-symbols-outlined">how_to_reg</span>
                     一鍵喬時間
                 </button>
@@ -606,7 +797,7 @@ function renderSyncStatusCard() {
                 <p class="font-body-md text-on-surface-variant text-center">已比對 ${memberIds.length} 位成員：${names}</p>
             </div>
             <div class="flex flex-col items-center gap-2">
-                <button onclick="hasRunSync = true; renderResultScreen();" class="w-full bg-[#3D786B] text-white font-headline-md text-headline-md py-4 rounded-xl flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform cursor-pointer hover:bg-[#2d584e]">
+                <button onclick="runSyncAndGenerateVotes();" class="w-full bg-[#3D786B] text-white font-headline-md text-headline-md py-4 rounded-xl flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform cursor-pointer hover:bg-[#2d584e]">
                     <span class="material-symbols-outlined">how_to_reg</span>
                     一鍵喬時間
                 </button>
@@ -749,22 +940,52 @@ function renderResultScreen() {
     renderResultMembers();
     renderSyncStatusCard();
     renderFreeTimeScheduleGrid();
+    renderVoteSettings();
+    renderVoteSection();
 }
 
 
 function openGroup(groupId) {
+    // 切換前，先讓 switchTab 保存當前 currentGroup 的狀態
+    switchTab(2, { preserveState: true });
+    
     currentGroup = groupId;
-    selectedMembers = [currentUser];
+    
+    const savedState = GROUP_SYNC_STATE[groupId];
+    if (savedState) {
+        loadGroupSyncState(groupId);
+    } else {
+        selectedMembers = [currentUser];
+        resetVoteState();
+        hasRunSync = false;
+    }
+    
     renderGroupMembers();
-    switchTab(2);
 }
 
-function switchTab(index) {
+function switchTab(index, options = {}) {
+    const preserveState = options.preserveState === true;
+    
+    if (currentGroup) {
+        saveCurrentGroupSyncState();
+    }
+    
     const screens = ['home-screen', 'courses-screen', 'group-screen', 'schedule-screen', 'result-screen'];
     
     screens.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden-screen');
+    });
+    
+    const notificationScreen = document.getElementById("notification-screen");
+    if (notificationScreen) {
+        notificationScreen.classList.add("hidden-screen");
+    }
+    
+    document.querySelectorAll(".notification-card").forEach(card => {
+        if (!card.closest("#notification-screen")) {
+            card.remove();
+        }
     });
     
     const targetScreen = document.getElementById(screens[index]);
@@ -775,8 +996,22 @@ function switchTab(index) {
 
     updateTabActive(index);
 
+    if (index === 1) {
+        renderCourses();
+    }
+    
+    if (index === 2) {
+        renderGroupMembers();
+    }
+
+    if (index === 3) {
+        renderSchedule();
+    }
+
     if (index === 4) {
-        hasRunSync = false;
+        if (currentGroup && GROUP_SYNC_STATE[currentGroup]) {
+            loadGroupSyncState(currentGroup);
+        }
         renderResultScreen();
     }
 }
@@ -790,5 +1025,671 @@ document.addEventListener("DOMContentLoaded", () => {
     renderCourses();
     renderGroupMembers();
     renderSchedule();
+    renderFriendList();
     switchTab(0);
 });
+
+// ==========================================
+// Friend Search and List Logic
+// ==========================================
+
+function isFriend(studentId) {
+    const user = STUDENTS_DATA.find(s => s.id === currentUser);
+    return user && user.friends.includes(studentId);
+}
+
+function addFriend(studentId) {
+    const user = STUDENTS_DATA.find(s => s.id === currentUser);
+    if (!user) return;
+    if (!user.friends.includes(studentId) && studentId !== currentUser) {
+        user.friends.push(studentId);
+        renderFriendList();
+        const keyword = document.getElementById("friend-search-input").value;
+        if (keyword) renderFriendSearchResults(keyword);
+    }
+}
+
+function renderFriendSearchResults(keyword) {
+    const container = document.getElementById("friend-search-results");
+    if (!container) return;
+    
+    keyword = keyword.trim().toLowerCase();
+    if (!keyword) {
+        container.innerHTML = "";
+        container.classList.add("hidden");
+        return;
+    }
+    
+    const results = STUDENTS_DATA.filter(s => 
+        s.name.toLowerCase().includes(keyword) || 
+        s.email.toLowerCase().includes(keyword)
+    );
+    
+    container.classList.remove("hidden");
+    container.innerHTML = "";
+    
+    if (results.length === 0) {
+        container.innerHTML = `<div class="bg-surface-container-lowest rounded-xl p-3 text-center text-on-surface-variant text-sm border border-surface-variant/30">找不到符合的同學</div>`;
+        return;
+    }
+    
+    results.forEach(student => {
+        const isMe = student.id === currentUser;
+        const alreadyFriend = isFriend(student.id);
+        
+        let btnHtml = "";
+        if (isMe) {
+            btnHtml = `<span class="text-xs text-outline font-medium px-2">這是你</span>`;
+        } else if (alreadyFriend) {
+            btnHtml = `<button disabled class="px-3 py-1 rounded-lg bg-surface-container-high text-on-surface-variant font-label-md text-label-md cursor-not-allowed">已是好友</button>`;
+        } else {
+            btnHtml = `<button onclick="addFriend('${student.id}')" class="px-3 py-1 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-primary/90 transition-colors">加好友</button>`;
+        }
+        
+        container.innerHTML += `
+            <div class="bg-surface-container-lowest rounded-xl p-3 shadow-sm flex items-center justify-between border border-surface-variant/30">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-primary font-bold">
+                        ${student.name[0]}
+                    </div>
+                    <div>
+                        <h4 class="font-body-md text-body-md font-bold text-on-surface">${student.name}</h4>
+                        <p class="text-[11px] text-on-surface-variant">${student.email}</p>
+                    </div>
+                </div>
+                <div>${btnHtml}</div>
+            </div>
+        `;
+    });
+}
+
+function renderFriendList() {
+    const container = document.getElementById("friend-list-container");
+    if (!container) return;
+    
+    const user = STUDENTS_DATA.find(s => s.id === currentUser);
+    if (!user || !user.friends || user.friends.length === 0) {
+        container.innerHTML = `<div class="text-on-surface-variant text-sm py-4 text-center">目前尚未新增好友</div>`;
+        return;
+    }
+    
+    container.innerHTML = "";
+    user.friends.forEach(friendId => {
+        const friend = STUDENTS_DATA.find(s => s.id === friendId);
+        if (!friend) return;
+        
+        container.innerHTML += `
+            <div class="bg-surface-container-lowest rounded-xl p-card-padding shadow-sm flex items-center justify-between border-l-2 border-outline-variant">
+                <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center font-headline-md text-body-lg">
+                        ${friend.name[0]}
+                    </div>
+                    <div>
+                        <h3 class="font-headline-md text-body-md text-on-surface">${friend.name}</h3>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+}
+
+// ==========================================
+// Custom Busy Modal Logic
+// ==========================================
+
+function openBusyModal() {
+    const modal = document.getElementById("busy-modal");
+    if (modal) modal.classList.remove("hidden");
+    const nameEl = document.getElementById("busy-name");
+    if (nameEl) nameEl.value = "";
+    const errorEl = document.getElementById("busy-error");
+    if (errorEl) errorEl.classList.add("hidden");
+}
+
+function closeBusyModal() {
+    const modal = document.getElementById("busy-modal");
+    if (modal) modal.classList.add("hidden");
+}
+
+function createBusyMask(startIndex, endIndex) {
+    let mask = 0;
+    for (let i = startIndex; i <= endIndex; i++) {
+        mask |= (1 << i);
+    }
+    return mask;
+}
+
+function saveCustomBusy() {
+    const type = document.getElementById("busy-type").value;
+    const name = document.getElementById("busy-name").value.trim();
+    const day = document.getElementById("busy-day").value;
+    const startIndex = parseInt(document.getElementById("busy-start").value);
+    const endIndex = parseInt(document.getElementById("busy-end").value);
+    const errorEl = document.getElementById("busy-error");
+    
+    if (!name) {
+        errorEl.textContent = "請輸入名稱";
+        errorEl.classList.remove("hidden");
+        return;
+    }
+    if (!day) {
+        errorEl.textContent = "請選擇星期";
+        errorEl.classList.remove("hidden");
+        return;
+    }
+    if (endIndex < startIndex) {
+        errorEl.textContent = "結束節次不能早於開始節次";
+        errorEl.classList.remove("hidden");
+        return;
+    }
+    
+    errorEl.classList.add("hidden");
+    
+    const mask = createBusyMask(startIndex, endIndex);
+    
+    const schedule = SCHEDULES_DATA[currentUser];
+    if (!schedule.customBusy) schedule.customBusy = {};
+    if (!schedule.customBusy.extra) schedule.customBusy.extra = [];
+    
+    schedule.customBusy.extra.push({
+        id: "busy-" + Date.now(),
+        type: type,
+        name: name,
+        day: day,
+        mask: mask
+    });
+    
+    closeBusyModal();
+    renderSchedule();
+    if(hasRunSync) renderResultScreen();
+}
+
+// ==========================================
+// Vote Section Logic & State Persistence
+// ==========================================
+
+let GROUP_SYNC_STATE = {};
+let currentFreeTimeResult = null;
+
+function structuredCloneSafe(data) {
+    return JSON.parse(JSON.stringify(data ?? null));
+}
+
+function saveCurrentGroupSyncState() {
+    if (!currentGroup) return;
+
+    GROUP_SYNC_STATE[currentGroup] = {
+        groupId: currentGroup,
+        selectedMembers: [...selectedMembers],
+        hasRunSync: hasRunSync,
+        freeTimeResult: structuredCloneSafe(currentFreeTimeResult),
+        weeklyMeetingCount: weeklyMeetingCount,
+        meetingDurationSlots: meetingDurationSlots,
+        voteOptions: structuredCloneSafe(voteOptions),
+        votesByOptionId: structuredCloneSafe(votesByOptionId),
+        currentUserVotes: [...currentUserVotes],
+        voteStarted: voteStarted,
+        voteEnded: voteEnded,
+        finalMeetingOptions: structuredCloneSafe(finalMeetingOptions),
+        hasAttemptedGenerateVote: hasAttemptedGenerateVote
+    };
+}
+
+function loadGroupSyncState(groupId) {
+    const saved = GROUP_SYNC_STATE[groupId];
+    if (!saved) return false;
+
+    currentGroup = saved.groupId;
+    selectedMembers = [...saved.selectedMembers];
+    hasRunSync = saved.hasRunSync;
+    currentFreeTimeResult = structuredCloneSafe(saved.freeTimeResult);
+    weeklyMeetingCount = saved.weeklyMeetingCount;
+    meetingDurationSlots = saved.meetingDurationSlots;
+    voteOptions = structuredCloneSafe(saved.voteOptions);
+    votesByOptionId = structuredCloneSafe(saved.votesByOptionId);
+    currentUserVotes = [...saved.currentUserVotes];
+    voteStarted = saved.voteStarted;
+    voteEnded = saved.voteEnded;
+    finalMeetingOptions = structuredCloneSafe(saved.finalMeetingOptions);
+    hasAttemptedGenerateVote = saved.hasAttemptedGenerateVote;
+
+    return true;
+}
+
+let voteOptions = [];
+let votesByOptionId = {};
+let currentUserVotes = []; // Array of voted option IDs
+let weeklyMeetingCount = 1;
+let meetingDurationSlots = 2;
+let voteStarted = false;
+let voteEnded = false;
+let finalMeetingOptions = [];
+let hasAttemptedGenerateVote = false;
+
+function resetVoteState() {
+    voteOptions = [];
+    votesByOptionId = {};
+    currentUserVotes = [];
+    voteStarted = false;
+    voteEnded = false;
+    finalMeetingOptions = [];
+    hasAttemptedGenerateVote = false;
+}
+
+function runSyncAndGenerateVotes() {
+    hasRunSync = true;
+    resetVoteState();
+    
+    const memberIds = getCompareMemberIds();
+    currentFreeTimeResult = calculateSelectedMembersFreeTime(memberIds);
+    
+    saveCurrentGroupSyncState();
+    renderResultScreen();
+}
+
+function createVoteOptions() {
+    const weeklySelect = document.getElementById("weekly-meeting-count");
+    const durationSelect = document.getElementById("meeting-duration-slots");
+    
+    if (weeklySelect) weeklyMeetingCount = parseInt(weeklySelect.value);
+    if (durationSelect) meetingDurationSlots = parseInt(durationSelect.value);
+    
+    const memberIds = getCompareMemberIds();
+    currentFreeTimeResult = calculateSelectedMembersFreeTime(memberIds);
+    
+    resetVoteState();
+    hasAttemptedGenerateVote = true;
+    
+    // Remember the settings because reset cleared them!
+    if (weeklySelect) weeklyMeetingCount = parseInt(weeklySelect.value);
+    if (durationSelect) meetingDurationSlots = parseInt(durationSelect.value);
+    
+    voteOptions = generateVoteOptionsFromFreeTime(currentFreeTimeResult, weeklyMeetingCount, meetingDurationSlots);
+    
+    // Mock votes
+    voteOptions.forEach(opt => {
+        votesByOptionId[opt.id] = [];
+    });
+    
+    const otherMembers = getCompareMemberIds().filter(id => id !== currentUser);
+    otherMembers.forEach(mId => {
+        if (voteOptions.length > 0 && Math.random() > 0.3) {
+            // Give them some random votes up to weeklyMeetingCount
+            for(let i=0; i<weeklyMeetingCount; i++) {
+                if (Math.random() > 0.5) continue;
+                const randomOpt = voteOptions[Math.floor(Math.random() * voteOptions.length)];
+                if(!votesByOptionId[randomOpt.id].includes(mId)) {
+                    votesByOptionId[randomOpt.id].push(mId);
+                }
+            }
+        }
+    });
+    
+    saveCurrentGroupSyncState();
+    
+    renderVoteSettings(); 
+    renderVoteSection();
+}
+
+function generateVoteOptionsFromFreeTime(freeTimeResult, count, duration) {
+    let options = [];
+    
+    for (const day of UI_DAYS) {
+        const mask = freeTimeResult[day];
+        if (mask > 0) {
+            const grouped = groupConsecutiveSlots(day, mask);
+            grouped.forEach(group => {
+                if (group.length >= duration) {
+                    for (let i = 0; i <= group.length - duration; i += duration) {
+                        const chunk = group.slice(i, i + duration);
+                        options.push({
+                            id: `vote-${day}-${chunk[0].index}`,
+                            day: day,
+                            slotIndexes: chunk.map(g => g.index),
+                            label: `週${DAYS_MAP[day]} ${formatSlotRange(chunk)}`,
+                            timeLabel: formatSlotTimeRange(chunk),
+                            length: chunk.length
+                        });
+                    }
+                }
+            });
+        }
+    }
+    
+    options.sort((a, b) => {
+        const aStart = a.slotIndexes[0];
+        const bStart = b.slotIndexes[0];
+        const aIsNight = aStart > 9 ? 1 : 0;
+        const bIsNight = bStart > 9 ? 1 : 0;
+        
+        if (aIsNight !== bIsNight) return aIsNight - bIsNight;
+        const dayOrder = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, sun: 7 };
+        if (dayOrder[a.day] !== dayOrder[b.day]) return dayOrder[a.day] - dayOrder[b.day];
+        return aStart - bStart;
+    });
+    
+    return options.slice(0, 6);
+}
+
+function getFinalMeetingOptions() {
+    let optionsWithVotes = voteOptions.map(opt => ({
+        ...opt,
+        voteCount: votesByOptionId[opt.id] ? votesByOptionId[opt.id].length : 0
+    }));
+
+    const dayOrder = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, sun: 7 };
+    
+    optionsWithVotes.sort((a, b) => {
+        if (b.voteCount !== a.voteCount) {
+            return b.voteCount - a.voteCount;
+        }
+        if (dayOrder[a.day] !== dayOrder[b.day]) {
+            return dayOrder[a.day] - dayOrder[b.day];
+        }
+        return a.slotIndexes[0] - b.slotIndexes[0];
+    });
+
+    return optionsWithVotes.slice(0, weeklyMeetingCount);
+}
+
+function startVote() {
+    if (voteOptions.length === 0) return;
+    voteStarted = true;
+    voteEnded = false;
+    
+    const group = GROUPS_DATA.find(g => g.id === currentGroup) || { name: "目前小組" };
+    addNotification(
+        "vote-start",
+        "小組討論時間投票開始",
+        `${group.name} 已開始討論時間投票，請組員盡快投票。`,
+        getCompareMemberIds()
+    );
+    
+    renderVoteSettings();
+    renderVoteSection();
+}
+
+function endVote() {
+    voteEnded = true;
+    finalMeetingOptions = getFinalMeetingOptions();
+    
+    const resultText = finalMeetingOptions.map(option => option.label).join("、");
+    const group = GROUPS_DATA.find(g => g.id === currentGroup);
+    const groupName = group ? group.name : "本小組";
+    
+    addNotification(
+        "vote-result",
+        "小組討論時間已決定",
+        `${groupName} 的本週討論時間為：${resultText}。`,
+        getCompareMemberIds()
+    );
+    
+    saveCurrentGroupSyncState();
+    renderVoteSection();
+    renderSchedule();
+}
+
+function voteForOption(optionId) {
+    if (!voteStarted || voteEnded) return;
+
+    const isVoted = currentUserVotes.includes(optionId);
+    
+    if (isVoted) {
+        // Cancel vote
+        currentUserVotes = currentUserVotes.filter(id => id !== optionId);
+        if (votesByOptionId[optionId]) {
+            votesByOptionId[optionId] = votesByOptionId[optionId].filter(id => id !== currentUser);
+        }
+    } else {
+        // Add vote
+        if (currentUserVotes.length >= weeklyMeetingCount) {
+            // Remove the oldest vote
+            const oldVote = currentUserVotes.shift();
+            if (votesByOptionId[oldVote]) {
+                votesByOptionId[oldVote] = votesByOptionId[oldVote].filter(id => id !== currentUser);
+            }
+        }
+        currentUserVotes.push(optionId);
+        if (votesByOptionId[optionId]) {
+            if (!votesByOptionId[optionId].includes(currentUser)) {
+                votesByOptionId[optionId].push(currentUser);
+            }
+        }
+    }
+    
+    renderVoteSection();
+}
+
+function renderVoteSettings() {
+    const container = document.getElementById("vote-settings-container");
+    if (!container) return;
+    
+    if (!hasRunSync) {
+        container.classList.add("hidden");
+        return;
+    }
+    
+    container.classList.remove("hidden");
+    
+    const hasOptions = hasAttemptedGenerateVote;
+    
+    container.innerHTML = `
+        <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider border-b border-surface-variant pb-2">投票設定</h2>
+        <p class="font-body-md text-on-surface-variant mb-2">先設定本週需要討論的次數與每次討論長度，系統會從共同空堂中產生候選時段。</p>
+        
+        <div class="grid grid-cols-2 gap-3 mb-2">
+            <div class="flex flex-col gap-1.5">
+                <label class="font-label-md text-on-surface-variant">一週討論幾次</label>
+                <select id="weekly-meeting-count" class="w-full bg-surface-container-low border-none rounded-lg p-3 text-body-md focus:ring-2 focus:ring-primary" ${hasOptions ? 'disabled' : ''}>
+                    <option value="1" ${weeklyMeetingCount === 1 ? 'selected' : ''}>1 次</option>
+                    <option value="2" ${weeklyMeetingCount === 2 ? 'selected' : ''}>2 次</option>
+                    <option value="3" ${weeklyMeetingCount === 3 ? 'selected' : ''}>3 次</option>
+                </select>
+            </div>
+            <div class="flex flex-col gap-1.5">
+                <label class="font-label-md text-on-surface-variant">每次討論多久</label>
+                <select id="meeting-duration-slots" class="w-full bg-surface-container-low border-none rounded-lg p-3 text-body-md focus:ring-2 focus:ring-primary" ${hasOptions ? 'disabled' : ''}>
+                    <option value="1" ${meetingDurationSlots === 1 ? 'selected' : ''}>1 節</option>
+                    <option value="2" ${meetingDurationSlots === 2 ? 'selected' : ''}>2 節</option>
+                    <option value="3" ${meetingDurationSlots === 3 ? 'selected' : ''}>3 節</option>
+                </select>
+            </div>
+        </div>
+        <button onclick="createVoteOptions()" class="w-full ${hasOptions ? 'bg-surface-container-highest text-on-surface-variant' : 'bg-primary text-on-primary'} font-headline-md text-body-lg py-3 rounded-xl mt-1 active:scale-95 transition-transform" ${voteStarted ? 'disabled style="opacity: 0.5;"' : ''}>
+            ${hasOptions ? '重新產生投票選項' : '產生投票選項'}
+        </button>
+    `;
+}
+
+function renderVoteSection() {
+    const container = document.getElementById("vote-options-container");
+    if (!container) return;
+    
+    if (!hasRunSync || !hasAttemptedGenerateVote) {
+        container.classList.add("hidden");
+        return;
+    }
+    
+    container.classList.remove("hidden");
+    
+    if (voteOptions.length === 0) {
+        container.innerHTML = `
+            <div class="mt-2 p-6 rounded-2xl bg-surface-container-lowest border border-surface-variant text-center shadow-sm">
+                <span class="material-symbols-outlined text-outline text-3xl mb-2">error</span>
+                <p class="font-body-md text-on-surface-variant">找不到符合討論長度的共同空堂，請改成較短討論時間或重新選擇組員。</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = `
+        <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider border-b border-surface-variant pb-2">投票選項</h2>
+    `;
+    
+    if (!voteStarted) {
+        html += `<button onclick="startVote()" class="w-full bg-primary text-on-primary font-headline-md text-body-lg py-3 rounded-xl mb-4 shadow-sm active:scale-95 transition-transform">開始投票</button>`;
+    } else if (voteStarted && !voteEnded) {
+        html += `<button onclick="endVote()" class="w-full bg-error text-on-error font-headline-md text-body-lg py-3 rounded-xl mb-4 shadow-sm active:scale-95 transition-transform">結束投票</button>`;
+    } else {
+        html += `<div class="w-full bg-surface-container-highest text-on-surface-variant font-headline-md text-body-lg py-3 rounded-xl mb-4 text-center">投票已結束</div>`;
+    }
+    
+    html += `<div class="vote-section">`;
+    
+    const topIds = getFinalMeetingOptions().map(opt => opt.id);
+    
+    voteOptions.forEach(opt => {
+        const votes = votesByOptionId[opt.id] ? votesByOptionId[opt.id].length : 0;
+        const isSelected = currentUserVotes.includes(opt.id);
+        const isFinal = voteEnded && finalMeetingOptions.some(f => f.id === opt.id);
+        
+        let btnHtml = "";
+        if (!voteStarted) {
+             btnHtml = `<button disabled class="px-4 py-2 bg-surface-container-highest text-on-surface-variant font-label-md rounded-lg cursor-not-allowed">尚未開始</button>`;
+        } else if (voteEnded) {
+             btnHtml = `<button disabled class="px-4 py-2 bg-surface-container-highest text-on-surface-variant font-label-md rounded-lg cursor-not-allowed border border-outline-variant">${isSelected ? '已投票' : '投票結束'}</button>`;
+        } else {
+             if (isSelected) {
+                 btnHtml = `<button onclick="voteForOption('${opt.id}')" class="px-4 py-2 bg-primary-container text-on-primary-container font-label-md rounded-lg hover:bg-error-container hover:text-on-error-container active:scale-95 transition-all shadow-inner border border-primary">已投票 (取消)</button>`;
+             } else {
+                 btnHtml = `<button onclick="voteForOption('${opt.id}')" class="px-4 py-2 bg-primary text-on-primary font-label-md rounded-lg hover:bg-primary-container active:scale-95 transition-all shadow-sm">投這個</button>`;
+             }
+        }
+        
+        let badgeHtml = `<span class="vote-count-badge">${votes} 票</span>`;
+        if (voteStarted && !voteEnded && votes > 0 && topIds.includes(opt.id)) {
+            badgeHtml += `<span class="vote-count-badge top-vote-badge ml-2 inline-flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">star</span>目前最高票</span>`;
+        } else if (voteEnded && isFinal) {
+            badgeHtml += `<span class="vote-count-badge bg-primary text-white ml-2 inline-flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">event_available</span>已選為討論時間</span>`;
+        }
+        
+        html += `
+            <div class="vote-option-card ${isSelected || isFinal ? 'selected' : ''}">
+                <div class="flex flex-col gap-1">
+                    <h3 class="font-headline-md text-body-lg font-bold text-on-surface">${opt.label}</h3>
+                    <p class="font-body-md text-body-md text-on-surface-variant flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[16px]">schedule</span>
+                        ${opt.timeLabel}
+                    </p>
+                    <div class="mt-2 flex items-center">
+                        ${badgeHtml}
+                    </div>
+                </div>
+                <div>
+                    ${btnHtml}
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `</div>`;
+    container.innerHTML = html;
+}
+
+// ==========================================
+// Notifications Logic
+// ==========================================
+
+let NOTIFICATIONS_DATA = [];
+let preNotificationScreenId = "home-screen";
+
+function addNotification(type, title, message, targetMemberIds) {
+    const notif = {
+        id: "N" + Date.now() + Math.floor(Math.random() * 1000),
+        type: type,
+        title: title,
+        message: message,
+        groupId: currentGroup,
+        targetMemberIds: Array.from(new Set(targetMemberIds)),
+        createdAt: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        read: false
+    };
+    NOTIFICATIONS_DATA.unshift(notif);
+    updateNotificationBadges();
+}
+
+function updateNotificationBadges() {
+    const unreadCount = NOTIFICATIONS_DATA.filter(n => !n.read && n.targetMemberIds.includes(currentUser)).length;
+    const badges = document.querySelectorAll(".notification-badge");
+    badges.forEach(badge => {
+        if (unreadCount > 0) {
+            badge.classList.remove("hidden");
+            if (unreadCount > 1) {
+                badge.classList.add("with-count");
+                badge.textContent = unreadCount;
+            } else {
+                badge.classList.remove("with-count");
+                badge.textContent = "";
+            }
+        } else {
+            badge.classList.add("hidden");
+        }
+    });
+}
+
+function openNotifications() {
+    document.querySelectorAll(".screen-content").forEach(el => {
+        if(!el.classList.contains("hidden-screen") && el.id !== "notification-screen") {
+            preNotificationScreenId = el.id;
+        }
+        el.classList.add("hidden-screen");
+    });
+    document.getElementById("notification-screen").classList.remove("hidden-screen");
+    renderNotifications();
+}
+
+function closeNotifications() {
+    document.getElementById("notification-screen").classList.add("hidden-screen");
+    document.getElementById(preNotificationScreenId).classList.remove("hidden-screen");
+}
+
+function markNotificationRead(id) {
+    const notif = NOTIFICATIONS_DATA.find(n => n.id === id);
+    if (notif) {
+        notif.read = true;
+        updateNotificationBadges();
+        
+        if (notif.type === "vote-start" || notif.type === "vote-result") {
+            closeNotifications();
+            switchTab(4, { preserveState: true }); 
+        } else {
+            renderNotifications();
+        }
+    }
+}
+
+function renderNotifications() {
+    const container = document.getElementById("notifications-list");
+    if (!container) return;
+    
+    const myNotifs = NOTIFICATIONS_DATA.filter(n => n.targetMemberIds.includes(currentUser));
+    
+    if (myNotifs.length === 0) {
+        container.innerHTML = `
+            <div class="mt-10 p-6 flex flex-col items-center justify-center text-on-surface-variant opacity-70">
+                <span class="material-symbols-outlined text-5xl mb-2">notifications_off</span>
+                <p>目前沒有通知</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = "";
+    myNotifs.forEach(n => {
+        const typeBadgeClass = n.type === "vote-start" ? "vote-start" : "vote-result";
+        const typeBadgeText = n.type === "vote-start" ? "投票開始" : "投票結果";
+        
+        html += `
+            <div class="notification-card ${!n.read ? 'unread shadow-sm' : 'opacity-70'}" onclick="markNotificationRead('${n.id}')">
+                <div class="flex justify-between items-start">
+                    <span class="notification-type-badge ${typeBadgeClass}">${typeBadgeText}</span>
+                    <span class="text-xs text-on-surface-variant">${n.createdAt}</span>
+                </div>
+                <h4 class="font-headline-md text-body-lg font-bold text-on-surface">${n.title}</h4>
+                <p class="font-body-md text-body-md text-on-surface-variant">${n.message}</p>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
