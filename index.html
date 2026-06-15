@@ -1,254 +1,334 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+
+<html class="light" lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TeamSync 跨堂分組共時排程引擎</title>
-    <!-- Google Fonts: Outfit (modern sans-serif) & Noto Sans TC -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TeamSync</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed-dim": "#b9c8db",
+                        "on-secondary-container": "#007164",
+                        "on-primary-container": "#f4fffc",
+                        "surface-container-high": "#e6e8ea",
+                        "surface-tint": "#006a61",
+                        "on-tertiary-fixed": "#0e1d2b",
+                        "on-tertiary-fixed-variant": "#3a4858",
+                        "secondary-container": "#96f3e1",
+                        "tertiary-fixed": "#d5e4f8",
+                        "tertiary-container": "#677687",
+                        "on-secondary-fixed": "#00201b",
+                        "surface-container": "#eceef0",
+                        "primary-fixed": "#89f5e7",
+                        "primary-container": "#008378",
+                        "primary": "#00685f",
+                        "secondary": "#006b5e",
+                        "outline": "#6d7a77",
+                        "on-tertiary-container": "#fdfcff",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-tertiary": "#ffffff",
+                        "outline-variant": "#bcc9c6",
+                        "surface-container-low": "#f2f4f6",
+                        "error": "#ba1a1a",
+                        "surface-bright": "#f7f9fb",
+                        "surface": "#f7f9fb",
+                        "on-error": "#ffffff",
+                        "tertiary": "#4f5d6e",
+                        "on-primary-fixed-variant": "#005049",
+                        "on-primary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "on-error-container": "#93000a",
+                        "on-secondary": "#ffffff",
+                        "surface-container-highest": "#e0e3e5",
+                        "on-secondary-fixed-variant": "#005046",
+                        "inverse-surface": "#2d3133",
+                        "secondary-fixed": "#96f3e1",
+                        "surface-dim": "#d8dadc",
+                        "on-surface-variant": "#3d4947",
+                        "surface-variant": "#e0e3e5",
+                        "background": "#f7f9fb",
+                        "on-primary-fixed": "#00201d",
+                        "secondary-fixed-dim": "#7ad7c6",
+                        "on-surface": "#191c1e",
+                        "primary-fixed-dim": "#6bd8cb",
+                        "inverse-primary": "#6bd8cb",
+                        "on-background": "#191c1e"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "card-padding": "16px",
+                        "container-margin": "16px",
+                        "base": "8px",
+                        "gutter": "12px",
+                        "section-gap": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Plus Jakarta Sans"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"],
+                        "headline-md": ["Plus Jakarta Sans"],
+                        "label-md": ["Plus Jakarta Sans"],
+                        "display-lg": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-lg": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-md": ["22px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "display-lg": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+</script>
+<link href="style.css" rel="stylesheet"/>
 </head>
-<body>
-    <div class="app-container">
-        <!-- Header Section -->
-        <header class="app-header">
-            <div class="header-left">
-                <div class="logo">
-                    <span class="logo-icon">⚡</span>
-                    <h1>TeamSync</h1>
-                </div>
-                <p class="subtitle">跨堂分組共時排程引擎 <span class="badge">Bitwise Core Engine</span></p>
-            </div>
-            <div class="header-right">
-                <div class="current-user-badge">
-                    <span class="label">目前操作使用者:</span>
-                    <span id="active-user-name" class="name">載入中...</span>
-                </div>
-            </div>
-        </header>
-
-        <!-- Main Dashboard Layout -->
-        <main class="dashboard-grid">
-            
-            <!-- Left Panel: Control Center -->
-            <section class="control-panel">
-                
-                <!-- Card 1: User Profile & Friends -->
-                <div class="dashboard-card">
-                    <div class="card-header">
-                        <span class="card-icon">👤</span>
-                        <h2>個人切換與好友名單</h2>
-                    </div>
-                    <div class="card-body">
-                        <div class="form-group">
-                            <label for="user-select">切換當前學生：</label>
-                            <select id="user-select" class="form-select">
-                                <!-- Dynamically populated -->
-                            </select>
+<body class="bg-background text-on-background font-body-md min-h-screen selection:bg-primary/20 antialiased">
+<div id="screens-container">
+<div class="screen-content bg-background text-on-background min-h-screen font-body-md antialiased selection:bg-primary/20" id="home-screen">
+<header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md shadow-sm flex items-center justify-between px-container-margin h-16 w-full">
+<div class="flex items-center gap-3">
+<img alt="TeamSync Logo" class="w-10 h-10 object-contain rounded-full shadow-sm" src="assets/logo.png"/>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-primary">TeamSync</h1>
+</div>
+<button class="text-primary hover:bg-surface-container-low transition-colors active:scale-95 duration-150 p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined custom-style-1">notifications</span>
+</button>
+</header><main class="pt-[88px] pb-[100px] px-container-margin flex flex-col gap-section-gap max-w-[600px] mx-auto disabled-md:max-w-none disabled-md:grid disabled-md:grid-cols-12 disabled-md:gap-gutter">
+<!-- Hero Section -->
+<section class="flex flex-col gap-2 pt-2 disabled-md:col-span-12">
+<h2 class="font-display-lg text-display-lg text-primary-container leading-tight">一鍵找出<br/>小組共同空堂</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-1">輕鬆比對課表，期末報告不再喬不到時間！</p>
+</section>
+<!-- Quick Actions -->
+<section class="grid grid-cols-3 gap-3 disabled-md:col-span-12 disabled-md:grid-cols-6 disabled-lg:grid-cols-8">
+<!-- Secondary Action -->
+<button class="flex flex-col items-center justify-center gap-2 bg-secondary-container text-on-secondary-container py-4 rounded-xl hover:bg-primary-fixed transition-colors active:scale-95 shadow-sm" onclick="switchTab(1)">
+<span class="material-symbols-outlined text-[28px] custom-style-2">menu_book</span>
+<span class="font-label-md text-label-md">查看課程</span>
+</button>
+<!-- Ghost Action -->
+<button class="flex flex-col items-center justify-center gap-2 bg-transparent border-[1.5px] border-primary text-primary py-4 rounded-xl hover:bg-surface-container-low transition-colors active:scale-95 shadow-sm" onclick="switchTab(2)">
+<span class="material-symbols-outlined text-[28px]">person_add</span>
+<span class="font-label-md text-label-md">新增好友</span>
+</button>
+<!-- Primary Action -->
+<button class="flex flex-col items-center justify-center gap-2 bg-primary text-on-primary py-4 rounded-xl hover:bg-primary-container transition-colors active:scale-95 shadow-[0_8px_24px_rgba(0,104,95,0.2)] disabled-md:col-span-2" onclick="switchTab(4)">
+<span class="material-symbols-outlined text-[28px] custom-style-2">sync</span>
+<span class="font-label-md text-label-md">一鍵喬時間</span>
+</button>
+</section>
+<!-- My Courses Container -->
+<section class="flex flex-col gap-3 disabled-md:col-span-12">
+<div class="flex items-center justify-between">
+<h3 class="font-headline-md text-headline-md text-on-surface">我的課程</h3>
+<button class="font-label-md text-label-md text-primary" onclick="switchTab(1)">查看全部</button>
+</div>
+<!-- Horizontal Scroll Area -->
+<div class="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory -mx-container-margin px-container-margin hide-scrollbar disabled-md:mx-0 disabled-md:px-0" id="home-courses-container"></div>
+</section>
+<!-- Recent Groups Section -->
+<section class="flex flex-col gap-3 disabled-md:col-span-12 disabled-lg:col-span-6 disabled-lg:col-start-1">
+<h3 class="font-headline-md text-headline-md text-on-surface">近期小組</h3>
+<div class="flex flex-col gap-3" id="home-groups-container"></div></section>
+</main>
+</div>
+<div class="screen-content bg-background text-on-background antialiased min-h-screen pb-24 pt-16 hidden-screen" id="courses-screen">
+<header class="bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md shadow-sm fixed top-0 w-full z-50 flex items-center justify-between px-container-margin h-16 w-full">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-high overflow-hidden shrink-0">
+<img alt="Student Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCHh37qmP97ftJjlumN9ZGBM2UtP4Zslb6CT8OFiwU4vyq-c2yd2elqN-fwt3DXIZ8WkChhhIg9Cw4Ngo9PTNuXvlN6bTeTWQz8BwU4_tlq3Z5o3d-mdBbtUV9o_EJ5z2yJD6NFSah9NHp-AymqE_JUjGcTQmqyXxW_lOEct1gAep0atcHZLIoZOXGm1K4ZcOWgLrV9QTmite_klbkpV6bHbUxkLRSwx4vAYOJGHAnoca0wNA2ggtozTLtLtrSUDI8InzsnJMHUg"/>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-primary dark:text-primary-fixed-dim tracking-tight">TeamSync</h1>
+</div>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-low transition-colors active:scale-95 duration-150 relative">
+<span class="material-symbols-outlined text-2xl" data-icon="notifications">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+</header><main class="max-w-4xl mx-auto px-container-margin pt-section-gap pb-section-gap">
+<header class="mb-section-gap flex items-end justify-between">
+<div>
+<h2 class="font-headline-md text-headline-md text-on-background">我的課程</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">目前參與的課程與小組進度</p>
+</div>
+<button class="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-primary hover:bg-surface-container-high transition-colors active:scale-95">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+</header>
+<!-- Course List -->
+<div class="grid grid-cols-1 disabled-md:grid-cols-2 gap-gutter" id="courses-list-container"></div>
+</main>
+</div>
+<div class="screen-content bg-surface text-on-surface antialiased min-h-screen flex flex-col pt-16 pb-24 disabled-md:pb-0 hidden-screen" id="group-screen">
+<header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md shadow-sm flex items-center justify-between px-container-margin h-16 transition-all duration-300">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-sm overflow-hidden">
+<img alt="Student Profile" class="w-full h-full object-cover" data-alt="A close-up portrait of a young college student with a bright, friendly smile, standing outdoors on a sunny campus. The background is slightly blurred with modern campus buildings and green trees. Light mode aesthetic, vibrant and clear lighting, energetic and fresh mood." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDbno-O4QzMlVybnl6cjX-Qv3FebpHI9y_9kZIDuARlvXDg_zB8zCFKwJCVpOI9x0nnbdnYs1uYr20NT_o59DQtfpYMSuzGVcPUY6D7SLp_Cy_Titf6Dbu2HoSUv76sz6gZr9iaFcDTA7zbgf0IBVGEl0fCZc86rXGB4f1A1QG3ClmAlnhviK11wL1F89rvXger8padTQ2vedfNUZr8On99wKWsI9gBZvXiN43GBGYg2PkDKON53RfipT8ia6mV5S6iZG1qJb1uig"/>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-primary">TeamSync</h1>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-low transition-colors active:scale-95 duration-150 relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+</header><main class="flex-grow w-full max-w-lg mx-auto px-container-margin flex flex-col gap-section-gap">
+<!-- Search Bar -->
+<div class="pt-4 relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none mt-4">
+<span class="material-symbols-outlined text-outline">search</span>
+</div>
+<input class="w-full bg-surface-container-low border-none rounded-xl py-3 pl-10 pr-4 text-body-lg focus:ring-2 focus:ring-primary focus:bg-surface transition-all placeholder:text-outline shadow-sm" placeholder="搜尋同學、組員..." type="text"/>
+</div>
+<!-- Groups Section -->
+<section class="flex flex-col gap-base">
+<h2 class="font-headline-md text-headline-md text-on-surface"><span id="selected-group-name"></span></h2>
+<p class="font-body-md text-body-md text-on-surface-variant mb-2">已選擇 <span class="font-bold text-primary" id="selected-count">0</span> 位成員</p>
+<div class="flex flex-col gap-3" id="group-members-container"></div>
+</section>
+<!-- Other Friends Section (Abridged for focus) -->
+<section class="flex flex-col gap-base mt-4 mb-24">
+<h2 class="font-headline-md text-headline-md text-on-surface-variant">好友名單</h2>
+<div class="flex flex-col gap-3 opacity-70">
+<!-- Friend Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl p-card-padding shadow-sm flex items-center justify-between border-l-2 border-outline-variant">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center font-headline-md text-body-lg">
+                            李
                         </div>
-                        <div class="friends-section">
-                            <label>好友清單 (<span id="friend-count">0</span>)：</label>
-                            <div id="friends-list" class="friends-list">
-                                <!-- Dynamically populated -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
+<div>
+<h3 class="font-headline-md text-body-md text-on-surface">李四</h3>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main><div class="fixed bottom-20 disabled-md:bottom-6 left-0 right-0 px-container-margin z-40 max-w-lg mx-auto pointer-events-none">
+<button class="w-full bg-primary text-on-primary font-headline-md text-body-lg py-4 rounded-xl shadow-level-2 flex justify-center items-center gap-2 pointer-events-auto transition-transform active:scale-95 opacity-50 cursor-not-allowed" id="schedule-btn" onclick="if(document.querySelectorAll('.member-checkbox:checked').length &gt; 0) switchTab(4)">
+<span class="material-symbols-outlined">sync</span>
+            準備喬時間
+        </button>
+</div>
+</div>
+<div class="screen-content bg-surface text-on-surface font-body-md min-h-screen pb-[100px] hidden-screen" id="schedule-screen">
+<header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md shadow-sm flex items-center justify-between px-container-margin h-16 w-full transition-colors duration-200">
+<div class="flex items-center gap-3">
+<img alt="User Avatar" class="w-8 h-8 rounded-full object-cover shadow-sm bg-surface-container-highest" src="https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg"/>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-primary">TeamSync</h1>
+</div>
+<button class="p-2 rounded-full hover:bg-surface-container-low transition-colors active:scale-95 duration-150 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="notifications">notifications</span>
+</button>
+</header><main class="pt-20 px-container-margin max-w-md mx-auto">
+<!-- Header Section -->
+<div class="flex items-center justify-between mb-section-gap">
+<h2 class="font-headline-md text-headline-md text-on-surface"><span id="schedule-owner-name"></span></h2>
+<button class="flex items-center gap-1 bg-primary text-on-primary px-3 py-2 rounded-lg font-label-md text-label-md shadow-sm hover:bg-surface-tint active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[16px]" data-icon="add">add</span>
+                新增不可用時間
+            </button>
+</div>
+<!-- Schedule Grid Card -->
+<div class="bg-surface-container-lowest rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.04)] p-1.5 mb-6 overflow-hidden"><div class="schedule-scroll-wrapper" id="schedule-scroll-wrapper">
+<div id="schedule-grid-container"></div>
+</div></div>
+<!-- Legend -->
+<div class="flex flex-wrap gap-4 items-center justify-center px-2">
+<div class="flex items-center gap-1.5">
+<div class="w-3 h-3 rounded-sm bg-primary shadow-sm"></div>
+<span class="font-label-md text-on-surface-variant">上課</span>
+</div>
+<div class="flex items-center gap-1.5">
+<div class="w-3 h-3 rounded-sm bg-error-container shadow-sm"></div>
+<span class="font-label-md text-on-surface-variant">打工</span>
+</div>
+<div class="flex items-center gap-1.5">
+<div class="w-3 h-3 rounded-sm bg-tertiary-fixed shadow-sm"></div>
+<span class="font-label-md text-on-surface-variant">社團</span>
+</div>
+<div class="flex items-center gap-1.5">
+<div class="w-3 h-3 rounded-sm bg-surface-container-highest border border-surface-variant diagonal-stripes"></div>
+<span class="font-label-md text-on-surface-variant">不可用</span>
+</div>
+<div class="flex items-center gap-1.5">
+<div class="w-3 h-3 rounded-sm bg-surface-container-low border border-surface-container-high"></div>
+<span class="font-label-md text-on-surface-variant">空堂</span>
+</div>
+</div>
+</main>
+</div>
+<div class="screen-content bg-background text-on-background font-body-md min-h-screen overflow-x-hidden selection:bg-primary/20 selection:text-primary hidden-screen" id="result-screen">
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md shadow-sm flex items-center justify-between px-container-margin h-16 w-full">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden flex items-center justify-center">
+<span class="font-headline-md text-headline-md text-on-surface-variant">我</span>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-primary dark:text-primary-fixed-dim">TeamSync</h1>
+<button class="text-primary dark:text-primary-fixed-dim hover:bg-surface-container-low transition-colors active:scale-95 duration-150 p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined custom-style-1">notifications</span>
+</button>
+</header>
+<main class="pt-20 pb-28 px-container-margin flex flex-col gap-section-gap w-full max-w-[600px] mx-auto">
+    <!-- 已選擇的小組成員 -->
+    <section class="flex flex-col gap-3">
+        <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider" id="sync-members-title">已選擇的小組成員</h2>
+        <div class="flex gap-4 overflow-x-auto hide-scrollbar pb-2" id="sync-members-list">
+            <!-- 動態插入 -->
+        </div>
+    </section>
 
-                <!-- Card 2: Group & Schedule Sync -->
-                <div class="dashboard-card">
-                    <div class="card-header">
-                        <span class="card-icon">👥</span>
-                        <h2>小組分組與忙碌時間設定</h2>
-                    </div>
-                    <div class="card-body">
-                        <div class="form-group">
-                            <label for="group-select">選擇課程小組：</label>
-                            <select id="group-select" class="form-select">
-                                <option value="">-- 請選擇小組 --</option>
-                                <!-- Dynamically populated -->
-                            </select>
-                        </div>
-                        
-                        <div id="group-members-section" class="members-section hidden">
-                            <div class="members-header">
-                                <label>小組成員名單與開關：</label>
-                                <span class="tip-text">可勾選納入個人「社團」與「打工」時間</span>
-                            </div>
-                            <div id="members-list" class="members-list">
-                                <!-- Dynamically populated -->
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-footer">
-                        <button id="sync-btn" class="btn btn-primary w-full disabled" disabled>
-                            <span class="btn-icon">⚡</span> 一鍵比對共時空堂
-                        </button>
-                    </div>
-                </div>
+    <!-- 核心視覺與狀態區 -->
+    <section class="grid grid-cols-1 gap-4" id="sync-status-card">
+        <!-- 動態插入狀態 -->
+    </section>
 
-                <!-- Card 3: Project Info -->
-                <div class="dashboard-card info-card">
-                    <div class="card-header">
-                        <span class="card-icon">ℹ️</span>
-                        <h2>關於此專案</h2>
-                    </div>
-                    <div class="card-body">
-                        <p>本專案為<strong>跨堂分組共時排程引擎</strong>前端展示系統。</p>
-                        <p>為解決大學生找時間讨论時的溝通成本，系統使用<strong>位元運算 (Bitwise Operations)</strong>，將 14 個時段壓縮成一個整數遮罩，以 $O(N)$ 時間複雜度一鍵求得小組交集。</p>
-                    </div>
-                </div>
+    <!-- 結果區域 -->
+    <section class="flex flex-col gap-4">
+        <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider border-b border-surface-variant pb-2">共同空堂時段</h2>
+        <div id="free-time-list" class="flex flex-col gap-4">
+            <!-- 動態插入 -->
+        </div>
+    </section>
+</main>
+</div>
+<nav class="fixed bottom-0 w-full z-50 bg-surface/80 backdrop-blur-md shadow-[0_-4px_12px_rgba(0,0,0,0.04)] flex justify-around items-center px-4 py-2 pb-safe border-t border-surface-variant/30 disabled-md:hidden">
+<!-- Active Tab -->
+<button class="flex flex-col items-center justify-center hover:bg-surface-container-high/50 transition-all active:scale-90 duration-200 px-3 py-1 rounded-xl w-16 text-on-surface-variant" id="tab-btn-0" onclick="switchTab(0)">
+<span class="material-symbols-outlined custom-style-1 tab-icon">home</span>
+<span class="font-label-md text-label-md mt-1">首頁</span>
+</button>
+<!-- Inactive Tabs -->
+<button class="flex flex-col items-center justify-center hover:bg-surface-container-high/50 transition-all active:scale-90 duration-200 px-3 py-1 rounded-xl w-16 text-on-surface-variant" id="tab-btn-1" onclick="switchTab(1)">
+<span class="material-symbols-outlined custom-style-1 tab-icon">menu_book</span>
+<span class="font-label-md text-label-md mt-1">課程</span>
+</button>
+<button class="flex flex-col items-center justify-center hover:bg-surface-container-high/50 transition-all active:scale-90 duration-200 px-3 py-1 rounded-xl w-16 text-on-surface-variant" id="tab-btn-2" onclick="switchTab(2)">
+<span class="material-symbols-outlined custom-style-1 tab-icon">group</span>
+<span class="font-label-md text-label-md mt-1">成員</span>
+</button>
+<button class="flex flex-col items-center justify-center hover:bg-surface-container-high/50 transition-all active:scale-90 duration-200 px-3 py-1 rounded-xl w-16 text-on-surface-variant" id="tab-btn-3" onclick="switchTab(3)">
+<span class="material-symbols-outlined custom-style-1 tab-icon">calendar_month</span>
+<span class="font-label-md text-label-md mt-1">課表</span>
+</button>
+<button class="flex flex-col items-center justify-center hover:bg-surface-container-high/50 transition-all active:scale-90 duration-200 px-3 py-1 rounded-xl w-16 text-on-surface-variant" id="tab-btn-4" onclick="switchTab(4)">
+<span class="material-symbols-outlined custom-style-1 tab-icon">sync</span>
+<span class="font-label-md text-label-md mt-1">喬時間</span>
+</button>
+</nav>
 
-            </section>
-
-            <!-- Right Panel: Schedule & Developer Visualizer -->
-            <section class="display-panel">
-                
-                <!-- Navigation Tabs -->
-                <div class="tabs-nav">
-                    <button class="tab-btn active" data-tab="schedule-tab">
-                        <span class="tab-icon">📅</span> 課表檢視與空堂交集
-                    </button>
-                    <button class="tab-btn" data-tab="visualizer-tab">
-                        <span class="tab-icon">⚙️</span> 位元運算與邏輯解析
-                    </button>
-                </div>
-
-                <!-- Tab Content: Weekly Schedule -->
-                <div id="schedule-tab" class="tab-content active">
-                    <div class="schedule-header">
-                        <div class="schedule-title-area">
-                            <h3 id="schedule-title">個人課表檢視</h3>
-                            <p id="schedule-subtitle">顯示目前學生的個人課表與忙碌時段</p>
-                        </div>
-                        <div class="legend-area">
-                            <span class="legend-item"><span class="color-box class"></span>課堂</span>
-                            <span class="legend-item"><span class="color-box club"></span>社團</span>
-                            <span class="legend-item"><span class="color-box work"></span>打工</span>
-                            <span class="legend-item"><span class="color-box synced-free"></span>共同空堂</span>
-                        </div>
-                    </div>
-
-                    <!-- The Grid Schedule -->
-                    <div class="schedule-container">
-                        <div class="schedule-grid">
-                            <!-- Header Row -->
-                            <div class="grid-header-cell time-label-header">時段</div>
-                            <div class="grid-header-cell">週一 (Mon)</div>
-                            <div class="grid-header-cell">週二 (Tue)</div>
-                            <div class="grid-header-cell">週三 (Wed)</div>
-                            <div class="grid-header-cell">週四 (Thu)</div>
-                            <div class="grid-header-cell">週五 (Fri)</div>
-
-                            <!-- Body rows generated dynamically by script.js -->
-                            <div id="schedule-body-rows" class="schedule-rows-wrapper">
-                                <!-- Generates 14 rows × 6 cells -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tab Content: Architect Visualizer -->
-                <div id="visualizer-tab" class="tab-content">
-                    <div class="visualizer-header">
-                        <h3>位元運算邏輯解析器 (Architect Visualizer)</h3>
-                        <p>將各組員 14 個時段的忙碌狀態，透過位元運算快速比對</p>
-                    </div>
-
-                    <!-- Bitwise Explanation Card -->
-                    <div class="visualizer-card formula-card">
-                        <h4>🎯 位元運算核心公式</h4>
-                        <div class="code-block">
-                            <code>// 1. 合併各組員忙碌遮罩，取得小組忙碌聯集 (OR 運算)</code><br>
-                            <code>groupBusyMask = member_1_Busy | member_2_Busy | ... | member_n_Busy;</code><br><br>
-                            <code>// 2. 取反並以 14-bit 遮罩 (0x3FFF) 限制，求出共同空堂交集 (NOT 運算)</code><br>
-                            <code>groupFreeMask = (~groupBusyMask) & 0x3FFF;</code>
-                        </div>
-                    </div>
-
-                    <!-- Dynamic Calculation Log -->
-                    <div class="visualizer-card calculation-card">
-                        <div class="calc-header">
-                            <h4>💻 當前比對細節日誌</h4>
-                            <div class="day-selector-wrapper">
-                                <label for="visualizer-day-select">觀看星期：</label>
-                                <select id="visualizer-day-select" class="form-select-sm">
-                                    <option value="mon">星期一 (Mon)</option>
-                                    <option value="tue">星期二 (Tue)</option>
-                                    <option value="wed">星期三 (Wed)</option>
-                                    <option value="thu">星期四 (Thu)</option>
-                                    <option value="fri">星期五 (Fri)</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="calc-body">
-                            <div class="bit-ruler">
-                                <span class="ruler-title">時段二進位對照：</span>
-                                <div class="ruler-bits">
-                                    <span>D</span><span>C</span><span>B</span><span>A</span><span>10</span><span>9</span><span>8</span><span>7</span><span>6</span><span>5</span><span>4</span><span>3</span><span>2</span><span>1</span>
-                                </div>
-                            </div>
-
-                            <div id="visualizer-members-log" class="calc-log-list">
-                                <!-- Dynamically populated calculation steps -->
-                                <p class="placeholder-text">請在左側選擇「課程小組」並點擊「一鍵比對共時空堂」以檢視位元運算日誌。</p>
-                            </div>
-
-                            <div id="visualizer-result-log" class="calc-result-area hidden">
-                                <!-- Synced calculation result -->
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Data Structure Explanation -->
-                    <div class="visualizer-card ds-card">
-                        <h4>📊 為什麼使用位元運算資料結構？</h4>
-                        <table class="ds-table">
-                            <thead>
-                                <tr>
-                                    <th>評估維度</th>
-                                    <th>傳統陣列交集 (Array Intersection)</th>
-                                    <th>位元運算遮罩 (Bitwise Mask) 🚀</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td><strong>資料結構</strong></td>
-                                    <td><code>Array of Booleans</code> 或 <code>Objects</code> (佔用較多記憶體)</td>
-                                    <td><code>14-bit Integer</code> (僅佔 1 個整數空間，極度輕量)</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>資料庫存儲</strong></td>
-                                    <td>需要多張關聯表或 JSON 字串，不易進行 SQL 篩選</td>
-                                    <td>在 <code>student_schedules</code> 中存為單一 <code>INT</code> 欄位，可用 SQL 位元查詢</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>比對演算法</strong></td>
-                                    <td>巢狀迴圈比對：$O(M \times N)$，需逐格檢查並過濾</td>
-                                    <td>位元或與反運算：$O(N)$，利用 CPU 暫存器單一指令即可完成 14 時段運算</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>擴充彈性</strong></td>
-                                    <td>隨時段增加，陣列操作與渲染開銷呈線性增長</td>
-                                    <td>在 32 位元/64 位元整數限制內（可支持高達 64 個時段），運算速度維持常數時間</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-            </section>
-        </main>
-    </div>
-
-    <!-- Load Mock Databases first, then logic engine -->
-    <script src="data/student.js"></script>
-    <script src="data/courses.js"></script>
-    <script src="data/schedules.js"></script>
-    <script src="data/groups.js"></script>
-    <script src="script.js"></script>
-</body>
+</div><script src="data/student.js"></script><script src="data/courses.js"></script><script src="data/groups.js"></script><script src="data/schedules.js"></script><script src="script.js"></script></body>
 </html>
